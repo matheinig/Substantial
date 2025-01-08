@@ -4,6 +4,8 @@ from substance_painter import project
 from substance_painter import event
 from substance_painter import textureset
 from substance_painter import js
+from substance_painter import logging
+from substance_painter import baking
 import os
  
 isNewProject = False
@@ -28,24 +30,59 @@ def onNewProjectReady():
     
     # Change some improtant settings to something I like more (inlcuding the highpoly file)
     for texset in textureset.all_texture_sets():
-        # is it me or there are still no baker settings in the python bindings?
-        # do we really have to go through javascript???
-        leEpicJsCommand = """
-        var bp = alg.baking.textureSetBakingParameters("{0}")
-        bp.materialParameters.detailParameters.Antialiasing = "Supersampling 4x"
-        bp.materialParameters.detailParameters.Match = "By Mesh Name"
-        bp.definitions["Ambient_occlusion"].parameters.Ignore_Backface = "By Mesh Name"
-        bp.definitions["Bent_normals"].parameters.Ignore_Backface = "By Mesh Name"
-        bp.materialParameters.detailParameters.High_Definition_Meshes = ["{1}"]
-        alg.baking.setTextureSetBakingParameters("{0}", bp)
-        alg.log.warn(bp)
-        """.format(texset.name(), highpolyFile)
-        js.evaluate(leEpicJsCommand)
-        print("[Substantial] Initialised the project settings")
+        bp = baking.BakingParameters.from_texture_set(texset)
+        common_params = bp.common()
+        ao_params = bp.baker(baking.MeshMapUsage.AO)
+        bn_params = bp.baker(baking.MeshMapUsage.BentNormals)
+        id_params = bp.baker(baking.MeshMapUsage.ID)
+        print(ao_params.keys())
+        baking.BakingParameters.set({
+            common_params['HipolyMesh'] : "file:///"+highpolyFile,
+            common_params['FilterMethod'] : common_params['FilterMethod'].enum_value('By Mesh Name'),
+            common_params['SubSampling'] : common_params['SubSampling'].enum_value('Supersampling 4x'),
+            ao_params['IgnoreBackfaceSecondary'] : ao_params['IgnoreBackfaceSecondary'].enum_value('By Mesh Name'),
+            bn_params['IgnoreBackfaceSecondary'] : bn_params['IgnoreBackfaceSecondary'].enum_value('By Mesh Name')
+        })
+
+    logging.log(logging.INFO, "Substantial", "Initialised the project settings")
 
     return
+
+def checkAndUpdatePath(originalPath):
+    result = originalPath
+    if not os.path.exists(originalPath): 
+        logging.log(logging.WARNING, "Substantial", "File "+ originalPath + " not found. ")
+        filename = os.path.basename(originalPath.replace('\\', '/'))
+        projectFolder = os.path.dirname(project.file_path())
+        potentialPath = projectFolder + "/" + filename
+        # Replace the file with the new one if it exists on the machine
+        if os.path.exists(potentialPath):
+            logging.log(logging.WARNING, "Substantial", "\t -> Replaced with "+potentialPath)
+            result = ("file:///"+potentialPath)
+    return result
+
 def onOldProjectReady():
-    # TODO: maybe convert the high poly mesh path to a local path so that the project can easily be shared (or do it at save time?)
+    for texset in textureset.all_texture_sets():
+        bp = baking.BakingParameters.from_texture_set(texset)
+        common_params = bp.common()
+
+        # Check if any file is missing and update their path if they are found next to the project file
+        highPolyFilesStr = str(common_params['HipolyMesh'].value())
+        highPolyFilesList = highPolyFilesStr.split("|")
+        newHighPolyFilesList = []
+        for hp in highPolyFilesList:
+            path = hp.strip("file:///")
+            newHighPolyFilesList.append(checkAndUpdatePath(path))
+
+        highPolyFilesStr = '|'.join(newHighPolyFilesList)
+        baking.BakingParameters.set({common_params['HipolyMesh']: highPolyFilesStr})
+
+        # TODO: same with cage files
+
+    return
+
+def onProjectSaved(e):
+
     return
 
 
@@ -53,7 +90,8 @@ def start_plugin():
     # Connect our callbacks to painter
     connections = {
         event.ProjectCreated: onNewProject,
-        event.ProjectEditionEntered: onProjectReady
+        event.ProjectEditionEntered: onProjectReady,
+        event.ProjectAboutToSave: onProjectSaved
     }
     for evt, callback in connections.items(): 
         event.DISPATCHER.connect(evt, callback) 
@@ -62,6 +100,3 @@ def close_plugin():
     return
 if __name__ == "__main__": 
     start_plugin() 
-
-# class substance_painter.event.
-# ProjectCreated
