@@ -50,9 +50,10 @@ def onNewProjectReady():
 
 def checkAndUpdatePath(originalPath):
     result = originalPath
-    if not os.path.exists(originalPath): 
-        logging.log(logging.WARNING, "Substantial", "File "+ originalPath + " not found. ")
-        filename = os.path.basename(originalPath.replace('\\', '/'))
+    searchPath = originalPath.strip("file:///")
+    if not os.path.exists(searchPath): 
+        logging.log(logging.WARNING, "Substantial", "File "+ searchPath + " not found. ")
+        filename = os.path.basename(searchPath.replace('\\', '/'))
         projectFolder = os.path.dirname(project.file_path())
         potentialPath = projectFolder + "/" + filename
         # Replace the file with the new one if it exists on the machine
@@ -77,8 +78,10 @@ def onOldProjectReady():
         highPolyFilesStr = '|'.join(newHighPolyFilesList)
         baking.BakingParameters.set({common_params['HipolyMesh']: highPolyFilesStr})
 
-        # TODO: same with cage files
-
+        # Same with cage files
+        cageFileStr = str(common_params['CageMesh'].value())
+        cageFileStr = checkAndUpdatePath(cageFileStr)
+        baking.BakingParameters.set({common_params['CageMesh']: cageFileStr})
     return
 
 def onProjectSaved(e):
