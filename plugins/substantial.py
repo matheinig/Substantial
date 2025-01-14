@@ -57,8 +57,8 @@ def checkAndUpdatePath(originalPath):
         # Replace the file with the new one if it exists on the machine
         if os.path.exists(potentialPath):
             logging.log(logging.WARNING, "Substantial", "\t -> Replaced with "+potentialPath)
-            result = potentialPath
-    return "file:///"+result
+            result = "file:///"+potentialPath
+    return result
 
 def onOldProjectReady():
     for texset in textureset.all_texture_sets():
@@ -71,8 +71,7 @@ def onOldProjectReady():
             highPolyFilesList = highPolyFilesStr.split("|")
             newHighPolyFilesList = []
             for hp in highPolyFilesList:
-                path = hp.strip("file:///")
-                newHighPolyFilesList.append(checkAndUpdatePath(path))
+                newHighPolyFilesList.append(checkAndUpdatePath(hp))
 
             highPolyFilesStr = '|'.join(newHighPolyFilesList)
             baking.BakingParameters.set({common_params['HipolyMesh']: highPolyFilesStr})
