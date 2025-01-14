@@ -27,7 +27,6 @@ def onNewProjectReady():
     # Find the highpoly file
     lowpolyFile = project.last_imported_mesh_path()
     highpolyFile = lowpolyFile.replace("_low.fbx", "_high.fbx")
-    
     # Change some improtant settings to something I like more (inlcuding the highpoly file)
     for texset in textureset.all_texture_sets():
         bp = baking.BakingParameters.from_texture_set(texset)
@@ -35,7 +34,6 @@ def onNewProjectReady():
         ao_params = bp.baker(baking.MeshMapUsage.AO)
         bn_params = bp.baker(baking.MeshMapUsage.BentNormals)
         id_params = bp.baker(baking.MeshMapUsage.ID)
-        print(ao_params.keys())
         baking.BakingParameters.set({
             common_params['HipolyMesh'] : "file:///"+highpolyFile,
             common_params['FilterMethod'] : common_params['FilterMethod'].enum_value('By Mesh Name'),
@@ -59,8 +57,8 @@ def checkAndUpdatePath(originalPath):
         # Replace the file with the new one if it exists on the machine
         if os.path.exists(potentialPath):
             logging.log(logging.WARNING, "Substantial", "\t -> Replaced with "+potentialPath)
-            result = ("file:///"+potentialPath)
-    return result
+            result = potentialPath
+    return "file:///"+result
 
 def onOldProjectReady():
     for texset in textureset.all_texture_sets():
@@ -69,19 +67,22 @@ def onOldProjectReady():
 
         # Check if any file is missing and update their path if they are found next to the project file
         highPolyFilesStr = str(common_params['HipolyMesh'].value())
-        highPolyFilesList = highPolyFilesStr.split("|")
-        newHighPolyFilesList = []
-        for hp in highPolyFilesList:
-            path = hp.strip("file:///")
-            newHighPolyFilesList.append(checkAndUpdatePath(path))
+        if len(highPolyFilesStr)>0:
+            highPolyFilesList = highPolyFilesStr.split("|")
+            newHighPolyFilesList = []
+            for hp in highPolyFilesList:
+                path = hp.strip("file:///")
+                newHighPolyFilesList.append(checkAndUpdatePath(path))
 
-        highPolyFilesStr = '|'.join(newHighPolyFilesList)
-        baking.BakingParameters.set({common_params['HipolyMesh']: highPolyFilesStr})
+            highPolyFilesStr = '|'.join(newHighPolyFilesList)
+            baking.BakingParameters.set({common_params['HipolyMesh']: highPolyFilesStr})
+            highPolyFilesStr = str(common_params['HipolyMesh'].value())
 
         # Same with cage files
         cageFileStr = str(common_params['CageMesh'].value())
-        cageFileStr = checkAndUpdatePath(cageFileStr)
-        baking.BakingParameters.set({common_params['CageMesh']: cageFileStr})
+        if len(cageFileStr)>0:
+            cageFileStr = checkAndUpdatePath(cageFileStr)
+            baking.BakingParameters.set({common_params['CageMesh']: cageFileStr})
     return
 
 def onProjectSaved(e):
